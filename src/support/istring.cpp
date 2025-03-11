@@ -50,10 +50,11 @@ std::string_view IString::interned(std::string_view s, bool reuse) {
   // Guards access to `globalStrings` and `allocated`.
   #ifndef BINARYEN_SINGLE_THREADED
   static std::mutex mutex;
-  #endif
 
   // A thread-local cache of strings to reduce contention.
-  thread_local static StringSet localStrings;
+  thread_local
+  #endif
+  static StringSet localStrings;
 
   auto [localIt, localInserted] = localStrings.insert(s);
   if (!localInserted) {
