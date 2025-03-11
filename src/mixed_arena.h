@@ -20,8 +20,12 @@
 #include <atomic>
 #include <cassert>
 #include <memory>
+
+#ifndef BINARYEN_SINGLE_THREADED
 #include <mutex>
 #include <thread>
+#endif
+
 #include <type_traits>
 #include <vector>
 
@@ -70,20 +74,25 @@ struct MixedArena {
 
   size_t index = 0; // in last chunk
 
+  #ifndef BINARYEN_SINGLE_THREADED
   std::thread::id threadId;
 
   // multithreaded allocation - each arena is valid on a specific thread.
   // if we are on the wrong thread, we atomically look in the linked
   // list of next, adding an allocator if necessary
   std::atomic<MixedArena*> next;
+  #endif
 
   MixedArena() {
+    #ifndef BINARYEN_SINGLE_THREADED
     threadId = std::this_thread::get_id();
     next.store(nullptr);
+    #endif
   }
 
   // Allocate an amount of space with a guaranteed alignment
   void* allocSpace(size_t size, size_t align) {
+    #ifndef BINARYEN_SINGLE_THREADED
     // the bump allocator data should not be modified by multiple threads at
     // once.
     auto myId = std::this_thread::get_id();
@@ -118,6 +127,7 @@ struct MixedArena {
       }
       return curr->allocSpace(size, align);
     }
+    #endif
     // First, move the current index in the last chunk to an aligned position.
     index = (index + align - 1) & (-align);
     if (index + size > CHUNK_SIZE || chunks.size() == 0) {
@@ -157,9 +167,11 @@ struct MixedArena {
 
   ~MixedArena() {
     clear();
+    #ifndef BINARYEN_SINGLE_THREADED
     if (next.load()) {
       delete next.load();
     }
+    #endif
   }
 };
 

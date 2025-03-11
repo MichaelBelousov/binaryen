@@ -18,7 +18,11 @@
 #include <array>
 #include <cassert>
 #include <map>
+
+#ifndef BINARYEN_SINGLE_THREADED
 #include <shared_mutex>
+#endif
+
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -555,7 +559,9 @@ HeapTypeInfo::~HeapTypeInfo() {
 namespace {
 
 struct TypeStore {
+  #ifndef BINARYEN_SINGLE_THREADED
   std::recursive_mutex mutex;
+  #endif
 
   // Track unique_ptrs for constructed types to avoid leaks.
   std::vector<std::unique_ptr<TypeInfo>> constructedTypes;
@@ -610,7 +616,11 @@ private:
       return *canonical;
     }
 
+    // FIXME: why not just use the _LIBCPP_HAS_THREADS or whatever? is there
+    // a portable check for a single threaded environment?
+    #ifndef BINARYEN_SINGLE_THREADED
     std::lock_guard<std::recursive_mutex> lock(mutex);
+    #endif
     // Check whether we already have a type for this structural Info.
     auto indexIt = typeIDs.find(std::cref(info));
     if (indexIt != typeIDs.end()) {
@@ -624,7 +634,10 @@ private:
 static TypeStore globalTypeStore;
 
 static std::vector<std::unique_ptr<HeapTypeInfo>> globalHeapTypeStore;
+
+#ifndef BINARYEN_SINGLE_THREADED
 static std::recursive_mutex globalHeapTypeStoreMutex;
+#endif
 
 #ifndef NDEBUG
 bool TypeStore::isGlobalStore() { return this == &globalTypeStore; }
@@ -632,7 +645,9 @@ bool TypeStore::isGlobalStore() { return this == &globalTypeStore; }
 
 // Keep track of the constructed recursion groups.
 struct RecGroupStore {
+  #ifndef BINARYEN_SINGLE_THREADED
   std::mutex mutex;
+  #endif
   // Store the structures of all rec groups created so far so we can avoid
   // creating duplicates.
   std::unordered_set<RecGroupStructure> canonicalGroups;
@@ -661,12 +676,16 @@ struct RecGroupStore {
 
   // Utility for canonicalizing HeapTypes with trivial recursion groups.
   HeapType insert(std::unique_ptr<HeapTypeInfo>&& info) {
+    #ifndef BINARYEN_SINGLE_THREADED
     std::lock_guard<std::mutex> lock(mutex);
+    #endif
     assert(!info->recGroup && "Unexpected nontrivial rec group");
     auto group = asHeapType(info).getRecGroup();
     auto canonical = insert(group);
     if (group == canonical) {
+      #ifndef BINARYEN_SINGLE_THREADED
       std::lock_guard<std::recursive_mutex> storeLock(globalHeapTypeStoreMutex);
+      #endif
       globalHeapTypeStore.emplace_back(std::move(info));
     }
     return canonical[0];
@@ -2652,7 +2671,10 @@ buildRecGroup(std::unique_ptr<RecGroupInfo>&& groupInfo,
   // the global rec group store here to avoid leaking temporary types to other
   // threads that may be trying to build an identical group.
   auto group = asHeapType(typeInfos[0]).getRecGroup();
+
+  #ifndef BINARYEN_SINGLE_THREADED
   std::lock_guard<std::mutex> lock(globalRecGroupStore.mutex);
+  #endif
   auto canonical = groupInfo ? globalRecGroupStore.insert(std::move(groupInfo))
                              : globalRecGroupStore.insert(group);
   if (group != canonical) {
@@ -2669,7 +2691,9 @@ buildRecGroup(std::unique_ptr<RecGroupInfo>&& groupInfo,
   // now canonical. We need to move its heap types to the heap type store so
   // they become canonical as well.
   {
+    #ifndef BINARYEN_SINGLE_THREADED
     std::lock_guard<std::recursive_mutex> lock(globalHeapTypeStoreMutex);
+    #endif
     for (auto& info : typeInfos) {
       info->isTemp = false;
       globalHeapTypeStore.emplace_back(std::move(info));

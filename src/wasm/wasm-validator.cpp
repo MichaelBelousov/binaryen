@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#ifndef BINARYEN_SINGLE_THREADED
 #include <mutex>
+#endif
+
 #include <set>
 #include <sstream>
 #include <unordered_set>
@@ -69,13 +72,17 @@ struct ValidationInfo {
   // a stream of error test for each function. we print in the right order at
   // the end, for deterministic output
   // note errors are rare/unexpected, so it's ok to use a slow mutex here
+  #ifndef BINARYEN_SINGLE_THREADED
   std::mutex mutex;
+  #endif
   std::unordered_map<Function*, std::unique_ptr<std::ostringstream>> outputs;
 
   ValidationInfo(Module& wasm) : wasm(wasm) { valid.store(true); }
 
   std::ostringstream& getStream(Function* func) {
+    #ifndef BINARYEN_SINGLE_THREADED
     std::unique_lock<std::mutex> lock(mutex);
+    #endif
     auto iter = outputs.find(func);
     if (iter != outputs.end()) {
       return *(iter->second.get());

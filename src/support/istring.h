@@ -26,7 +26,10 @@
 
 #include <assert.h>
 
+#ifndef BINARYEN_SINGLE_THREADED
 #include "threads.h"
+#endif
+
 #include "utilities.h"
 
 namespace wasm {

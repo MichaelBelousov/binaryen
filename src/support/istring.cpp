@@ -48,7 +48,9 @@ std::string_view IString::interned(std::string_view s, bool reuse) {
   static std::vector<std::vector<char>> allocated;
 
   // Guards access to `globalStrings` and `allocated`.
+  #ifndef BINARYEN_SINGLE_THREADED
   static std::mutex mutex;
+  #endif
 
   // A thread-local cache of strings to reduce contention.
   thread_local static StringSet localStrings;
@@ -60,7 +62,9 @@ std::string_view IString::interned(std::string_view s, bool reuse) {
   }
 
   // No copy yet in the local cache. Check the global cache.
+  #ifndef BINARYEN_SINGLE_THREADED
   std::unique_lock<std::mutex> lock(mutex);
+  #endif
   auto [globalIt, globalInserted] = globalStrings.insert(s);
   if (!globalInserted) {
     // We already had a global copy of this string. Cache it locally.

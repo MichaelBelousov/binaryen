@@ -29,7 +29,11 @@
 
 #include "ir/debuginfo.h"
 #include "support/small_vector.h"
+
+#ifndef BINARYEN_SINGLE_THREADED
 #include "support/threads.h"
+#endif
+
 #include "wasm.h"
 
 namespace wasm {

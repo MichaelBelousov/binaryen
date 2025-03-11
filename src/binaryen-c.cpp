@@ -18,7 +18,9 @@
 // Binaryen C API implementation
 //===============================
 
+#ifndef BINARYEN_SINGLE_THREADED
 #include <mutex>
+#endif
 
 #include "binaryen-c.h"
 #include "cfg/Relooper.h"
@@ -167,7 +169,9 @@ Literal fromBinaryenLiteral(BinaryenLiteral x) {
 // are used at once this should be optimized to be per-
 // module, but likely it doesn't matter)
 
+#ifndef BINARYEN_SINGLE_THREADED
 static std::mutex BinaryenFunctionMutex;
+#endif
 
 // Optimization options
 static PassOptions globalPassOptions =
@@ -4685,7 +4689,9 @@ static BinaryenFunctionRef addFunctionInternal(BinaryenModuleRef module,
   // Lock. This can be called from multiple threads at once, and is a
   // point where they all access and modify the module.
   {
+    #ifndef BINARYEN_SINGLE_THREADED
     std::lock_guard<std::mutex> lock(BinaryenFunctionMutex);
+    #endif
     ((Module*)module)->addFunction(ret);
   }
 

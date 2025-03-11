@@ -42,7 +42,11 @@
 #include <ir/type-updating.h>
 #include <ir/utils.h>
 #include <pass.h>
+
+#ifndef BINARYEN_SINGLE_THREADED
 #include <support/threads.h>
+#endif
+
 #include <wasm.h>
 
 #include "call-utils.h"

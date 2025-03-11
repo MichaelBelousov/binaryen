@@ -884,12 +884,15 @@ void PassRunner::run() {
     std::vector<Pass*> stack;
     auto flush = [&]() {
       if (stack.size() > 0) {
+        size_t numFunctions = wasm->functions.size();
+
+        #ifndef BINARYEN_SINGLE_THREADED
+
         // run the stack of passes on all the functions, in parallel
         size_t num = ThreadPool::get()->size();
         std::vector<std::function<ThreadWorkState()>> doWorkers;
         std::atomic<size_t> nextFunction;
         nextFunction.store(0);
-        size_t numFunctions = wasm->functions.size();
         for (size_t i = 0; i < num; i++) {
           doWorkers.push_back([&]() {
             auto index = nextFunction.fetch_add(1);
@@ -911,9 +914,25 @@ void PassRunner::run() {
           });
         }
         ThreadPool::get()->work(doWorkers);
+
+        #else
+
+        // run the stack of passes on all the functions, in order
+        for (size_t index = 0; index < numFunctions; index++) {
+          Function* func = this->wasm->functions[index].get();
+          if (!func->imported()) {
+            // do the current task: run all passes on this function
+            for (auto* pass : stack) {
+              runPassOnFunction(pass, func);
+            }
+          }
+        }
+        #endif
       }
+
       stack.clear();
     };
+
     for (auto& pass : passes) {
       if (pass->isFunctionParallel()) {
         stack.push_back(pass.get());
