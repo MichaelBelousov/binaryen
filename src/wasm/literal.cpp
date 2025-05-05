@@ -570,7 +570,11 @@ void Literal::printVec128(std::ostream& o, const std::array<uint8_t, 16>& v) {
 namespace {
 struct PrintLimiter {
   static const size_t PRINT_LIMIT = 100;
+  #ifndef BINARYEN_SINGLE_THREADED
   static thread_local size_t printed;
+  #else //BINARYEN_SINGLE_THREADED
+  static size_t printed;
+  #endif //BINARYEN_SINGLE_THREADED
 
   bool isTopLevel;
 
@@ -585,7 +589,11 @@ struct PrintLimiter {
   bool stop() { return printed >= PRINT_LIMIT; }
 };
 
+#ifndef BINARYEN_SINGLE_THREADED
 thread_local size_t PrintLimiter::printed = 0;
+#else //BINARYEN_SINGLE_THREADED
+size_t PrintLimiter::printed = 0;
+#endif //BINARYEN_SINGLE_THREADED
 
 } // namespace
 
